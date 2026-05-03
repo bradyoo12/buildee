@@ -1,0 +1,116 @@
+# {{PROJECT_NAME}}
+
+You are working on a **Buildee project**. The end user is a non-developer.
+This file gives you the rules and conventions for this specific project.
+
+## Project context
+
+- **Name**: {{PROJECT_NAME}}
+- **Type**: {{PROJECT_TYPE}}
+- **Original description**: {{DESCRIPTION}}
+
+## Working principles (Buildee-wide)
+
+### 1. Tickets define the work
+
+Every change you make is driven by a GitHub Issue created by Buildee. The issue
+body has a structured task spec. Read it carefully:
+
+- **Goal** — what to accomplish
+- **Input context** — Spec/Design version, related files
+- **Acceptance criteria** — must all pass for PR to be acceptable
+- **Constraints** — design tokens, allowed dependencies, etc.
+
+If the issue is ambiguous, leave a comment with `[STATUS:CLARIFICATION_NEEDED]`
+and stop. Do not guess and proceed.
+
+### 2. Status updates via comments
+
+Update the issue with status as you work. Use these prefixes:
+
+- `[STATUS:STARTED]` — work begun, scope confirmed
+- `[STATUS:WORKING]` — implementing changes
+- `[STATUS:GUARDRAIL_RUNNING]` — running build/lint/domain checks
+- `[STATUS:GUARDRAIL_FAILED]` — checks failed; explain which and why
+- `[STATUS:READY_FOR_REVIEW]` — PR opened, awaiting user
+- `[STATUS:ERROR]` — unrecoverable error; explain
+
+The Buildee server parses these prefixes and notifies the user in real time.
+
+### 3. PR conventions
+
+- Branch name: `ticket-{ticketId}-{short-slug}`
+- Commit messages: `[ticket-{id}] <imperative summary>`
+- PR title: same as issue title
+- PR description: link to issue + summary of changes + screenshots if visual
+
+### 4. Layered changes
+
+Buildee separates layers (Spec → Design → Code). Always change the highest
+applicable layer first:
+
+- If user asks for a new section → update Design (Composition), then Code follows
+- Don't hardcode values in Code that should live in Content/Config
+
+### 5. Design tokens are mandatory
+
+This project has a generated design system in `src/design/tokens.ts` (or similar).
+
+- Use only these tokens for colors, fonts, spacing, shadows
+- Hard-coded hex colors (`#FF0000`, `rgb(...)`) → guardrail rejection
+- New tokens require a separate Design System ticket; don't invent them
+
+### 6. Dependencies allowlist
+
+Adding new npm packages requires the package to be in the allowlist
+(`buildee-allowed-deps.json` at repo root). Allowed in MVP:
+
+- `react`, `react-dom`, `next`
+- `tailwindcss`, `clsx`
+- `zod`
+- All `@buildee/*` workspace packages
+
+If you need something else, open the ticket comment with
+`[STATUS:CLARIFICATION_NEEDED]` and ask. Don't `npm install` outside the list.
+
+### 7. Traceability
+
+Every component and page must have a comment linking back to the source:
+
+```tsx
+/**
+ * Generated from: SpecVersion sv_xxx, DesignVersion ds_yyy
+ * Ticket: #N
+ */
+export function Hero() { ... }
+```
+
+This is what lets users (and you, in the next ticket) ask "why is this here?".
+
+### 8. Guardrails — what will reject your PR
+
+The server runs gate checks before user review:
+
+- **Layer 1 (build)**: `npm run build` must succeed
+- **Layer 2 (lint)**: ESLint errors block; warnings OK
+- **Layer 5 (domain rules)**:
+  - No hardcoded colors/fonts
+  - Dependencies match allowlist
+  - Traceability comments present in changed files
+  - All `[data-editable]` attributes preserved on existing editable elements
+
+If a guardrail fails, fix the cause (don't disable the rule) and update the PR.
+
+### 9. Don't touch
+
+Files you should never modify:
+
+- `.github/workflows/*` — CI managed by Buildee
+- `buildee.config.ts` (or similar) — system config
+- `CLAUDE.md` (this file) — system gen
+
+If a change requires touching these, leave a comment and stop.
+
+## Project-specific rules
+
+(This section gets filled in by the system as the project evolves.)

@@ -1,0 +1,33 @@
+{
+  "name": "@buildee/db",
+  "version": "0.1.0",
+  "description": "Buildee DB layer — app_main + Project DB management",
+  "type": "module",
+  "main": "./src/index.ts",
+  "types": "./src/index.ts",
+  "exports": {
+    ".": {
+      "types": "./src/index.ts",
+      "default": "./src/index.ts"
+    }
+  },
+  "files": ["src", "prisma"],
+  "scripts": {
+    "build": "tsc",
+    "prisma:generate": "prisma generate --schema=./prisma/schema.prisma && prisma generate --schema=./prisma/project-schema.prisma",
+    "prisma:migrate:dev": "prisma migrate dev --schema=./prisma/schema.prisma",
+    "prisma:migrate:deploy": "prisma migrate deploy --schema=./prisma/schema.prisma",
+    "prisma:studio": "prisma studio --schema=./prisma/schema.prisma"
+  },
+  "dependencies": {
+    "@prisma/client": "^5.22.0",
+    "lru-cache": "^11.0.2",
+    "pg": "^8.13.1"
+  },
+  "devDependencies": {
+    "@types/node": "^22.10.0",
+    "@types/pg": "^8.11.10",
+    "prisma": "^5.22.0",
+    "typescript": "^5.7.2"
+  }
+}

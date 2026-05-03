@@ -1,0 +1,565 @@
+// ============================================================
+// Buildee — app_main DB schema
+// 시스템 운영 데이터 (User, Project, Spec, Ticket, DecisionLog, ...)
+// 옵션 E: 단일 Postgres 서버 + Project별 분리 DB. 이건 운영 DB.
+// ============================================================
+
+generator client {
+  provider = "prisma-client-js"
+  output   = "../src/generated/app-client"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL_APP_MAIN")
+}
+
+// =================================================================
+// Enums
+// =================================================================
+
+enum PlanTier {
+  FREE
+  STARTER
+  PRO
+  ENTERPRISE
+}
+
+enum Tier3Provider {
+  OPENAI
+  GEMINI
+}
+
+enum Platform {
+  WEB
+  PWA
+  MOBILE_IOS
+  MOBILE_ANDROID
+  MOBILE_UNIVERSAL
+  WEB_AND_MOBILE
+}
+
+enum ProjectType {
+  LANDING
+  CONTENT
+  FORM
+  OTHER
+}
+
+enum ProjectStatus {
+  ACTIVE
+  PENDING_DELETION
+  DELETED
+}
+
+enum DesignSystemOrigin {
+  TEMPLATE
+  GENERATED
+}
+
+enum TemplateStatus {
+  ACTIVE
+  DEPRECATED
+}
+
+enum DeploymentEnvironment {
+  PREVIEW
+  PRODUCTION
+}
+
+enum DeploymentStatus {
+  PENDING
+  BUILDING
+  LIVE
+  FAILED
+}
+
+enum TicketType {
+  DESIGN
+  CODE
+  DEPLOY
+  MAINTENANCE
+  FORM
+}
+
+enum TicketStatus {
+  PENDING
+  IN_PROGRESS
+  COMPLETED
+  FAILED
+  GUARDRAIL_FAILED
+}
+
+enum Provider {
+  CLAUDE_CODE_PC
+  ANTHROPIC_API
+  OPENAI_API
+  GEMINI_API
+}
+
+enum TicketResultStatus {
+  SUCCESS
+  FAILED
+  NEEDS_REVIEW
+}
+
+enum ChangeCategory {
+  CONTENT
+  CONFIG
+  COMPOSITION
+  DESIGN_SYSTEM
+  CODE
+  FULL_STACK
+  FORM
+}
+
+enum ChangeRequestStatus {
+  PROPOSED
+  USER_REVIEWING
+  APPROVED
+  REJECTED
+  APPLIED
+}
+
+enum FormDefinitionStatus {
+  DRAFT
+  ACTIVE
+  ARCHIVED
+}
+
+enum AssetStatus {
+  PREVIEW
+  LIVE
+}
+
+enum WorkerType {
+  PC
+  API
+}
+
+enum WorkerStatus {
+  ACTIVE
+  INACTIVE
+}
+
+// =================================================================
+// User
+// =================================================================
+
+model User {
+  id       String   @id @default(uuid()) @db.Uuid
+  email    String   @unique
+  name     String?
+  planTier PlanTier @default(FREE) @map("plan_tier")
+
+  // Tier 3 (외부 프로바이더) 사전 옵트인
+  tier3OptIn          Boolean         @default(false) @map("tier3_opt_in")
+  tier3OptInProviders Tier3Provider[] @default([]) @map("tier3_opt_in_providers")
+  tier3OptInDate      DateTime?       @map("tier3_opt_in_date")
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  // Relations
+  projects       Project[]
+  changeRequests ChangeRequest[]
+  uploadedAssets Asset[]
+
+  @@map("users")
+}
+
+// =================================================================
+// Project
+// =================================================================
+
+model Project {
+  id     String @id @default(uuid()) @db.Uuid
+  userId String @map("user_id") @db.Uuid
+  name   String
+
+  platform Platform    @default(WEB)
+  type     ProjectType @default(LANDING)
+
+  // GitHub repo
+  repoUrl String? @map("repo_url")
+
+  // Project DB (옵션 E)
+  dataDbName    String? @unique @map("data_db_name") // 예: "proj_a3xk7m2"
+  schemaVersion Int     @default(0) @map("schema_version")
+
+  // 생애주기
+  status            ProjectStatus @default(ACTIVE)
+  pendingDeletionAt DateTime?     @map("pending_deletion_at")
+
+  // 라이브 상태 포인터 (current_*) — 모두 nullable, 점진 채워짐
+  currentSpecVersionId     String? @map("current_spec_version_id") @db.Uuid
+  currentDesignSystemId    String? @map("current_design_system_id") @db.Uuid
+  currentCompositionId     String? @map("current_composition_id") @db.Uuid
+  currentCodebaseVersionId String? @map("current_codebase_version_id") @db.Uuid
+  currentDeploymentId      String? @map("current_deployment_id") @db.Uuid
+
+  // Project별 가드레일 설정 (활성 레이어, 강도 등)
+  guardrailConfig Json? @map("guardrail_config")
+
+  createdAt DateTime  @default(now()) @map("created_at")
+  updatedAt DateTime  @updatedAt @map("updated_at")
+  deletedAt DateTime? @map("deleted_at")
+
+  // Relations
+  user             User              @relation(fields: [userId], references: [id], onDelete: Cascade)
+  specVersions     SpecVersion[]
+  designSystems    DesignSystem[]
+  compositions     PageComposition[]
+  codebaseVersions CodebaseVersion[]
+  deployments      Deployment[]
+  tickets          Ticket[]
+  changeRequests   ChangeRequest[]
+  decisionLogs     DecisionLog[]
+  formDefinitions  FormDefinition[]
+  assets           Asset[]
+
+  @@index([userId, status])
+  @@map("projects")
+}
+
+// =================================================================
+// SpecVersion (불변 버전 패턴)
+// =================================================================
+
+model SpecVersion {
+  id              String  @id @default(uuid()) @db.Uuid
+  projectId       String  @map("project_id") @db.Uuid
+  parentVersionId String? @map("parent_version_id") @db.Uuid
+
+  naturalLanguage          String  @map("natural_language")
+  structured               Json
+  interpretationConfidence Float?  @map("interpretation_confidence")
+  userConfirmed            Boolean @default(false) @map("user_confirmed")
+
+  createdAt DateTime @default(now()) @map("created_at")
+  createdBy String?  @map("created_by") // user uuid 또는 'ai'
+
+  project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  @@index([projectId, createdAt])
+  @@map("spec_versions")
+}
+
+// =================================================================
+// DesignSystem (Project별 인스턴스, 불변 버전 패턴)
+// =================================================================
+
+model DesignSystem {
+  id        String             @id @default(uuid()) @db.Uuid
+  projectId String             @map("project_id") @db.Uuid
+  origin    DesignSystemOrigin
+
+  templateId    String? @map("template_id") @db.Uuid
+  divergenceLog Json?   @map("divergence_log")
+
+  tokens             Json
+  componentsManifest Json @map("components_manifest")
+
+  createdAt DateTime @default(now()) @map("created_at")
+
+  project  Project               @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  template DesignSystemTemplate? @relation(fields: [templateId], references: [id])
+
+  @@index([projectId, createdAt])
+  @@map("design_systems")
+}
+
+// =================================================================
+// DesignSystemTemplate (시스템 운영자 관리)
+// =================================================================
+
+model DesignSystemTemplate {
+  id               String         @id @default(uuid()) @db.Uuid
+  name             String
+  category         String
+  suitableFor      String[]       @default([]) @map("suitable_for")
+  tone             String
+  includedFeatures String[]       @default([]) @map("included_features")
+  previewImageUrl  String?        @map("preview_image_url")
+  snapshotData     Json           @map("snapshot_data")
+  version          Int            @default(1)
+  status           TemplateStatus @default(ACTIVE)
+
+  createdAt DateTime @default(now()) @map("created_at")
+
+  designSystems DesignSystem[]
+
+  @@index([status, category])
+  @@map("design_system_templates")
+}
+
+// =================================================================
+// PageComposition (DesignSystem 안에서 페이지 구성, 불변 버전 패턴)
+// =================================================================
+
+model PageComposition {
+  id              String  @id @default(uuid()) @db.Uuid
+  projectId       String  @map("project_id") @db.Uuid
+  designSystemId  String  @map("design_system_id") @db.Uuid
+  parentVersionId String? @map("parent_version_id") @db.Uuid
+
+  pages Json // 각 페이지의 컴포넌트 트리
+
+  createdAt DateTime @default(now()) @map("created_at")
+
+  project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  @@index([projectId, createdAt])
+  @@map("page_compositions")
+}
+
+// =================================================================
+// CodebaseVersion (Git commit 기반)
+// =================================================================
+
+model CodebaseVersion {
+  id                    String  @id @default(uuid()) @db.Uuid
+  projectId             String  @map("project_id") @db.Uuid
+  parentVersionId       String? @map("parent_version_id") @db.Uuid
+  sourceDesignVersionId String? @map("source_design_version_id") @db.Uuid
+  sourceCompositionId   String? @map("source_composition_id") @db.Uuid
+
+  commitSha String @map("commit_sha")
+  branch    String
+  prNumber  Int?   @map("pr_number")
+
+  createdAt DateTime @default(now()) @map("created_at")
+
+  project     Project      @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  deployments Deployment[]
+
+  @@index([projectId, createdAt])
+  @@map("codebase_versions")
+}
+
+// =================================================================
+// Deployment
+// =================================================================
+
+model Deployment {
+  id                String                @id @default(uuid()) @db.Uuid
+  projectId         String                @map("project_id") @db.Uuid
+  codebaseVersionId String                @map("codebase_version_id") @db.Uuid
+  environment       DeploymentEnvironment
+  url               String
+  status            DeploymentStatus      @default(PENDING)
+
+  createdAt  DateTime  @default(now()) @map("created_at")
+  deployedAt DateTime? @map("deployed_at")
+
+  project         Project         @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  codebaseVersion CodebaseVersion @relation(fields: [codebaseVersionId], references: [id])
+
+  @@index([projectId, environment, status])
+  @@map("deployments")
+}
+
+// =================================================================
+// Ticket (큐 + 작업 추적, 옵션 E의 SKIP LOCKED 큐 패턴)
+// =================================================================
+
+model Ticket {
+  id        String       @id @default(uuid()) @db.Uuid
+  projectId String       @map("project_id") @db.Uuid
+  type      TicketType
+  spec      Json // 구조화된 작업 명세
+  status    TicketStatus @default(PENDING)
+
+  // 워커 라우팅 + Provider 추상화
+  preferredProvider Provider? @map("preferred_provider")
+  actualProvider    Provider? @map("actual_provider")
+  providerHistory   Json      @default("[]") @map("provider_history")
+
+  // 큐 락 (visibility timeout)
+  lockedBy     String?   @map("locked_by")
+  lockedUntil  DateTime? @map("locked_until")
+  attemptCount Int       @default(0) @map("attempt_count")
+
+  // 의존성 그래프
+  parentTicketIds String[] @default([]) @map("parent_ticket_ids") @db.Uuid
+
+  // GitHub 연동
+  githubIssueNumber Int? @map("github_issue_number")
+
+  createdAt   DateTime  @default(now()) @map("created_at")
+  startedAt   DateTime? @map("started_at")
+  completedAt DateTime? @map("completed_at")
+
+  project      Project        @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  results      TicketResult[]
+  decisionLogs DecisionLog[]
+
+  // 큐 픽업 핵심 인덱스
+  @@index([status, lockedUntil, createdAt])
+  @@index([projectId, status])
+  @@map("tickets")
+}
+
+// =================================================================
+// TicketResult
+// =================================================================
+
+model TicketResult {
+  id       String @id @default(uuid()) @db.Uuid
+  ticketId String @map("ticket_id") @db.Uuid
+
+  prNumber     Int?     @map("pr_number")
+  commits      String[] @default([])
+  filesChanged String[] @default([]) @map("files_changed")
+
+  // 가드레일 8 layer 결과
+  guardrailResults Json @map("guardrail_results")
+
+  decisionLogSummary String?  @map("decision_log_summary")
+  durationMs         Int?     @map("duration_ms")
+  costEstimate       Decimal? @map("cost_estimate") @db.Decimal(10, 4)
+
+  status TicketResultStatus
+
+  createdAt DateTime @default(now()) @map("created_at")
+
+  ticket Ticket @relation(fields: [ticketId], references: [id], onDelete: Cascade)
+
+  @@index([ticketId, createdAt])
+  @@map("ticket_results")
+}
+
+// =================================================================
+// ChangeRequest (사용자 요청 → 처리 흐름)
+// =================================================================
+
+model ChangeRequest {
+  id        String @id @default(uuid()) @db.Uuid
+  projectId String @map("project_id") @db.Uuid
+  userId    String @map("user_id") @db.Uuid
+
+  userMessage     String         @map("user_message")
+  proposedChanges Json           @map("proposed_changes")
+  changeCategory  ChangeCategory @map("change_category")
+  affectedLayers  String[]       @default([]) @map("affected_layers")
+  confidence      Float?
+  alternatives    Json           @default("[]")
+
+  status            ChangeRequestStatus @default(PROPOSED)
+  resultingVersions Json?               @map("resulting_versions")
+
+  createdAt  DateTime  @default(now()) @map("created_at")
+  resolvedAt DateTime? @map("resolved_at")
+
+  project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  user    User    @relation(fields: [userId], references: [id])
+
+  @@index([projectId, status, createdAt])
+  @@map("change_requests")
+}
+
+// =================================================================
+// DecisionLog (AI 결정 추적, 유지보수 핵심 자산)
+// =================================================================
+
+model DecisionLog {
+  id         String  @id @default(uuid()) @db.Uuid
+  projectId  String  @map("project_id") @db.Uuid
+  entityType String  @map("entity_type") // 'spec_version' | 'design_system' | ...
+  entityId   String  @map("entity_id") @db.Uuid
+  ticketId   String? @map("ticket_id") @db.Uuid
+
+  input         Json
+  reasoning     String
+  outputSummary String? @map("output_summary")
+  provider      String?
+  model         String?
+
+  createdAt DateTime @default(now()) @map("created_at")
+
+  project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  ticket  Ticket? @relation(fields: [ticketId], references: [id])
+
+  @@index([projectId, entityId, createdAt])
+  @@index([ticketId])
+  @@map("decision_logs")
+}
+
+// =================================================================
+// FormDefinition (양식 정의는 운영 DB. 응답은 Project DB.)
+// =================================================================
+
+model FormDefinition {
+  id              String  @id @default(uuid()) @db.Uuid
+  projectId       String  @map("project_id") @db.Uuid
+  parentVersionId String? @map("parent_version_id") @db.Uuid
+
+  name               String
+  fields             Json // FormField[]
+  submitButtonText   String? @map("submit_button_text")
+  successMessage     String? @map("success_message")
+  notificationConfig Json?   @map("notification_config")
+
+  status FormDefinitionStatus @default(DRAFT)
+
+  createdAt DateTime @default(now()) @map("created_at")
+
+  project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  @@index([projectId, status])
+  @@map("form_definitions")
+}
+
+// =================================================================
+// Asset (Azure Blob 미디어)
+// =================================================================
+
+model Asset {
+  id         String      @id @default(uuid()) @db.Uuid
+  projectId  String      @map("project_id") @db.Uuid
+  blobUrl    String      @map("blob_url")
+  mimeType   String      @map("mime_type")
+  sizeBytes  Int         @map("size_bytes")
+  dimensions Json?
+  status     AssetStatus @default(PREVIEW)
+
+  uploadedById String   @map("uploaded_by_id") @db.Uuid
+  uploadedAt   DateTime @default(now()) @map("uploaded_at")
+
+  project    Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  uploadedBy User    @relation(fields: [uploadedById], references: [id])
+
+  @@index([projectId, status])
+  @@map("assets")
+}
+
+// =================================================================
+// ProviderHealth (워커 라우팅 결정용)
+// =================================================================
+
+model ProviderHealth {
+  provider          Provider  @id
+  lastSuccessAt     DateTime? @map("last_success_at")
+  lastFailureAt     DateTime? @map("last_failure_at")
+  recentFailureRate Float     @default(0) @map("recent_failure_rate")
+  avgResponseMs     Int       @default(0) @map("avg_response_ms")
+
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@map("provider_health")
+}
+
+// =================================================================
+// WorkerHeartbeat (PC/API 워커 상태)
+// =================================================================
+
+model WorkerHeartbeat {
+  workerId        String       @id @map("worker_id")
+  workerType      WorkerType   @map("worker_type")
+  status          WorkerStatus @default(ACTIVE)
+  lastHeartbeatAt DateTime     @map("last_heartbeat_at")
+  currentTicketId String?      @map("current_ticket_id") @db.Uuid
+
+  @@index([status, lastHeartbeatAt])
+  @@map("worker_heartbeats")
+}

@@ -1,0 +1,51 @@
+// ============================================================
+// Buildee — proj_template DB schema
+// 각 Project DB(proj_{shortId})에 적용되는 스키마.
+// 옵션 E: 사용자 사이트 데이터(form_submissions 등)는 Project DB에.
+// 시스템 운영 데이터(form_definitions 자체는 app_main에).
+// ============================================================
+
+generator client {
+  provider = "prisma-client-js"
+  output   = "../src/generated/project-client"
+}
+
+datasource db {
+  provider = "postgresql"
+  // URL은 런타임에 동적 주입. 빌드 시엔 placeholder.
+  url      = env("DATABASE_URL_PROJ_TEMPLATE")
+}
+
+// =================================================================
+// Enums
+// =================================================================
+
+enum SubmissionStatus {
+  NEW
+  READ
+  ARCHIVED
+}
+
+// =================================================================
+// FormSubmission
+// 양식 응답. form_definition_id는 app_main의 form_definitions.id 참조.
+// Cross-DB이므로 Prisma relation 안 만듦 (referential integrity는 애플리케이션 레이어).
+// =================================================================
+
+model FormSubmission {
+  id String @id @default(uuid()) @db.Uuid
+
+  formDefinitionId String @map("form_definition_id") @db.Uuid
+  formVersionId    String @map("form_version_id") @db.Uuid
+
+  submittedAt DateTime @default(now()) @map("submitted_at")
+  submitterIp String?  @map("submitter_ip")
+
+  submittedData Json @map("submitted_data") // 사용자가 채운 모든 필드 값
+
+  status SubmissionStatus @default(NEW)
+
+  @@index([formDefinitionId, submittedAt])
+  @@index([status, submittedAt])
+  @@map("form_submissions")
+}

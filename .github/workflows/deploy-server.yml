@@ -1,0 +1,78 @@
+name: Deploy server to Azure
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'apps/server/**'
+      - 'packages/db/**'
+      - '.github/workflows/deploy-server.yml'
+  workflow_dispatch:
+
+env:
+  NODE_VERSION: '20'
+  AZURE_WEBAPP_NAME: buildee-server-dev
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 9
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'pnpm'
+
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm --filter @buildee/db prisma:generate
+      - run: pnpm typecheck
+      - run: pnpm --filter @buildee/server test
+
+  deploy:
+    needs: test
+    runs-on: ubuntu-latest
+    environment: production
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 9
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'pnpm'
+
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm --filter @buildee/db prisma:generate
+      - run: pnpm --filter @buildee/server build
+
+      - name: Prepare deployment package
+        run: |
+          mkdir -p deploy/apps/server deploy/packages/db
+          cp -r apps/server/dist deploy/apps/server/
+          cp apps/server/package.json deploy/apps/server/
+          cp -r packages/db/prisma deploy/packages/db/
+          cp packages/db/package.json deploy/packages/db/
+          cp pnpm-workspace.yaml package.json deploy/
+          cd deploy && pnpm install --prod --frozen-lockfile
+
+      - name: Deploy to Azure App Service
+        uses: azure/webapps-deploy@v3
+        with:
+          app-name: ${{ env.AZURE_WEBAPP_NAME }}
+          publish-profile: ${{ secrets.AZURE_WEBAPP_PUBLISH_PROFILE }}
+          package: ./deploy
+
+      - name: Run app_main migrations
+        env:
+          DATABASE_URL_APP_MAIN: ${{ secrets.DATABASE_URL_APP_MAIN }}
+        run: |
+          cd packages/db
+          pnpm prisma migrate deploy
