@@ -142,19 +142,11 @@ echo "Created: $ISSUE_URL (Ready 보드 등록)"
 
 ### 6-1. 브랜치 생성
 
-`b-start` step2-claim.md 2c의 type prefix 규칙과 **반드시 동일** — b-start가 같은 이름으로 검색해서 재사용한다:
+브랜치는 항상 `<number>-<slug>` 형식 — type prefix 없이 티켓 번호로 시작. b-start가 같은 이름으로 검색해서 재사용한다:
 
 ```bash
 SLUG=$(echo "$ISSUE_TITLE" | tr '[:upper:]' '[:lower:]' | tr -cs '[:alnum:]' '-' | cut -c1-30 | sed 's/-$//')
-
-# Type prefix (b-start step2-claim.md 2c와 동일)
-case "$TYPE_LOWER" in
-  bug)     PREFIX="fix/" ;;
-  test)    PREFIX="test/" ;;
-  improve) PREFIX="improve/" ;;
-  *)       PREFIX="" ;;
-esac
-BRANCH="${PREFIX}${ISSUE_NUM}-${SLUG}"   # 예: fix/4-grace-period-cleanup
+BRANCH="${ISSUE_NUM}-${SLUG}"   # 예: 4-grace-period-cleanup
 
 git checkout main && git pull --rebase
 git checkout -b "$BRANCH"

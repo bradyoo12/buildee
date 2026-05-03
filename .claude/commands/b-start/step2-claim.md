@@ -112,11 +112,7 @@ ISSUE_LABELS=$(jq -r '[.labels[].name] | join(",")' /tmp/issue-<number>.json)
 
 ## 2c: 분류 + 브랜치 결정 (create-ticket이 만든 브랜치 우선 재사용)
 
-Type 감지 → 브랜치 네이밍:
-- Bug (`fix:`, `bug` label) → `fix/<number>-<slug>`
-- Test (`test:`) → `test/<number>-<slug>`
-- Improve (`improve:`) → `improve/<number>-<slug>`
-- 기본 → `<number>-<slug>`
+브랜치 네이밍: 항상 `<number>-<slug>` (type prefix 없음).
 
 **기존 브랜치 검색 (REQUIRED)** — create-ticket Step 6이 RED 테스트와 함께 이미 만든 브랜치가 있으면 새로 만들지 않고 재사용한다. 이 commit이 RED→GREEN 검증 베이스라인이라 사라지면 검증 무효:
 
@@ -126,7 +122,7 @@ TICKET_BRANCH=""
 
 git fetch origin --prune
 
-# remote에서 <number>-* 또는 <prefix>/<number>-* 형식 검색
+# remote에서 <number>-로 시작하는 브랜치 검색 (legacy <prefix>/<number>-도 호환)
 CANDIDATE=$(git ls-remote --heads origin | awk '{print $2}' | sed 's|refs/heads/||' | \
   grep -E "(^|/)<number>-" | head -1)
 
@@ -135,8 +131,8 @@ if [ -n "$CANDIDATE" ]; then
   EXISTING_BRANCH=true
   echo "[#<number>] Reusing branch from create-ticket: $TICKET_BRANCH"
 else
-  # 새로 만들 때만 type prefix 적용 (create-ticket Step 6-1과 동일 규칙)
-  TICKET_BRANCH="<TYPE_PREFIX><number>-<slug>"
+  # 새로 만들 때도 prefix 없이 <number>-<slug>
+  TICKET_BRANCH="<number>-<slug>"
 fi
 ```
 
