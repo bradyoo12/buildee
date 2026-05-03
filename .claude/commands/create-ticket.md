@@ -102,18 +102,36 @@ fi
 
 ---
 
-## Step 5 — Issue 생성
+## Step 5 — Issue 생성 + Project Board (Ready로)
 
 ```bash
+# Project board IDs 로드
+source .claude/project-board.config
+if [ -z "$PROJECT_ID" ] || [ -z "$STATUS_FIELD_ID" ]; then
+  echo "ERROR: project-board.config 비어있음. 먼저 실행:"
+  echo "  gh auth refresh -s project,read:project"
+  echo "  bash .claude/scripts/setup-project-board.sh"
+  exit 1
+fi
+
 gh issue create --repo bradyoo12/buildee \
   --title "${TYPE}: ${SHORT_GOAL}" \
   --body-file /tmp/ticket-body.md \
-  --label "${TYPE_LOWER}"   # 존재하는 type 라벨만. 없으면 --label 생략. claude-process 같은 워크플로 라벨 금지
+  --label "status" \
+  --label "${TYPE_LOWER}"   # 존재하는 type 라벨만. 없으면 두 번째 --label 생략
 
-# 방금 만든 issue 번호 (created order로)
 ISSUE_NUM=$(gh issue list --repo bradyoo12/buildee --limit 1 --state open --json number --jq '.[0].number')
 ISSUE_URL=$(gh issue view $ISSUE_NUM --repo bradyoo12/buildee --json url --jq .url)
-echo "Created: $ISSUE_URL"
+
+# Project board 추가 + Ready로 이동
+ITEM_ID=$(gh project item-add $PROJECT_NUMBER --owner $PROJECT_OWNER --url "$ISSUE_URL" --format json --jq '.id')
+if [[ "$ITEM_ID" == PVTI_* ]]; then
+  gh project item-edit --project-id $PROJECT_ID --id "$ITEM_ID" \
+    --field-id $STATUS_FIELD_ID --single-select-option-id $OPT_READY
+  bash .claude/scripts/gh-project-cache.sh save-item-id "$ISSUE_NUM" "$ITEM_ID"
+fi
+
+echo "Created: $ISSUE_URL (Ready 보드 등록)"
 ```
 
 ---
@@ -124,11 +142,19 @@ echo "Created: $ISSUE_URL"
 
 ### 6-1. 브랜치 생성
 
-`b-start`의 슬러그 규칙과 **반드시 동일**:
+`b-start` step2-claim.md 2c의 type prefix 규칙과 **반드시 동일** — b-start가 같은 이름으로 검색해서 재사용한다:
 
 ```bash
 SLUG=$(echo "$ISSUE_TITLE" | tr '[:upper:]' '[:lower:]' | tr -cs '[:alnum:]' '-' | cut -c1-30 | sed 's/-$//')
-BRANCH="${ISSUE_NUM}-${SLUG}"   # 예: 4-infra-readme-monorepo
+
+# Type prefix (b-start step2-claim.md 2c와 동일)
+case "$TYPE_LOWER" in
+  bug)     PREFIX="fix/" ;;
+  test)    PREFIX="test/" ;;
+  improve) PREFIX="improve/" ;;
+  *)       PREFIX="" ;;
+esac
+BRANCH="${PREFIX}${ISSUE_NUM}-${SLUG}"   # 예: fix/4-grace-period-cleanup
 
 git checkout main && git pull --rebase
 git checkout -b "$BRANCH"
@@ -239,5 +265,6 @@ Branch:  N-<slug>  (RED tests pushed)
 ## 비고
 
 - 본체 레포 전용. 사용자 사이트 repo의 ChangeRequest는 자체 시스템(`services/issue-builder.ts`)이 만들고 그 흐름은 분리
-- Type 라벨이 부족하면 추가하지 말고 기본 `claude-process` + 본문 Type 명시로 충분
+- Type 라벨이 부족하면 추가하지 말고 기본 `status` + 본문 Type 명시로 충분
 - 위험도(Risk) HIGH인 경우 — Brad가 직접 검토 권장. b-start로 자동 처리 비추
+- **Refs #N 컨벤션** — Step 6의 RED 커밋 + Step 7의 b-start 안내 모두 `Refs #N` 사용. `Closes/Fixes/Resolves` 금지 (b-start의 Step 5 검증 통과 후에만 명시적으로 close)
