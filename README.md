@@ -53,6 +53,37 @@ buildee/
         └── deploy-server.yml    # CI/CD
 ```
 
+## 아키텍처 다이어그램
+
+<!-- ticket: #4 -->
+
+이 모노레포 안의 컴포넌트 + 외부(GitHub App, Azure, 사용자 사이트 repo, Editor) 관계:
+
+```mermaid
+graph LR
+  User[사용자]
+  Editor[Editor<br/>React + Vite + iframe]
+  Server[apps/server<br/>Fastify 오케스트레이션]
+  DB[(packages/db<br/>Postgres app_main + per-Project)]
+  GHApp[GitHub App<br/>buildee-projects org]
+  UserRepo[User Site Repo<br/>buildee-projects/proj-*]
+  KV[Azure Key Vault]
+
+  User --> Editor
+  Editor -->|REST + WebSocket| Server
+  Server -->|Prisma| DB
+  Server -->|Octokit| GHApp
+  GHApp -->|push / PR / webhook| UserRepo
+  UserRepo -->|webhook 이벤트| Server
+  Server -->|secret fetch| KV
+```
+
+흐름 요약:
+- **Editor → server**: 사용자 자연어 요청을 REST로 전송, 진척은 WebSocket으로 수신
+- **server → DB**: `app_main` (사용자/프로젝트 메타) + 프로젝트별 분리 DB (사용자 콘텐츠)
+- **server ↔ GitHub App ↔ user repo**: 코드/콘텐츠 변경을 푸시 + PR로 격리, webhook으로 결과 회신
+- **server → Key Vault**: GitHub App private key, DB 비밀번호 등 시크릿은 inline 금지
+
 ## 다음 단계
 
 배포 절차: [`docs/deployment-runbook.md`](docs/deployment-runbook.md) 따라 진행.
