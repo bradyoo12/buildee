@@ -1,4 +1,4 @@
-# ADR-0005: 불변 버전 + Project의 `current_*` 포인터로 라이브 상태
+# ADR-0005: 버전 관리 — 불변 버전 + Project의 `current_*` 포인터
 
 **상태**: Accepted (MVP)
 **날짜**: 2026-05-03
