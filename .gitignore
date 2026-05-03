@@ -25,3 +25,4 @@ Thumbs.db
 *.pem
 *.key
 publish-profile.xml
+/.vs/buildee
