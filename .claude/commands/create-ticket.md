@@ -108,7 +108,7 @@ fi
 gh issue create --repo bradyoo12/buildee \
   --title "${TYPE}: ${SHORT_GOAL}" \
   --body-file /tmp/ticket-body.md \
-  --label "claude-process,type:${TYPE_LOWER},risk:${RISK_LOWER}"
+  --label "${TYPE_LOWER}"   # 존재하는 type 라벨만. 없으면 --label 생략. claude-process 같은 워크플로 라벨 금지
 
 # 방금 만든 issue 번호 (created order로)
 ISSUE_NUM=$(gh issue list --repo bradyoo12/buildee --limit 1 --state open --json number --jq '.[0].number')
@@ -128,7 +128,7 @@ echo "Created: $ISSUE_URL"
 
 ```bash
 SLUG=$(echo "$ISSUE_TITLE" | tr '[:upper:]' '[:lower:]' | tr -cs '[:alnum:]' '-' | cut -c1-30 | sed 's/-$//')
-BRANCH="ticket-${ISSUE_NUM}-${SLUG}"
+BRANCH="${ISSUE_NUM}-${SLUG}"   # 예: 4-infra-readme-monorepo
 
 git checkout main && git pull --rebase
 git checkout -b "$BRANCH"
@@ -228,7 +228,7 @@ $RED_SUMMARY
 
 ```
 Created: https://github.com/bradyoo12/buildee/issues/N
-Branch:  ticket-N-<slug>  (RED tests pushed)
+Branch:  N-<slug>  (RED tests pushed)
 
 다음:
   /b-start N    # 브랜치 checkout → 구현 → tests GREEN → PR

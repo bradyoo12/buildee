@@ -14,6 +14,11 @@ node_modules/.prisma/
 .vscode/*
 !.vscode/extensions.json
 .idea/
+.vs/
+*.suo
+*.user
+*.userosscache
+*.sln.docstates
 
 # Test
 coverage/

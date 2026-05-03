@@ -10,7 +10,7 @@ Buildee 본체 (`bradyoo12/buildee`) GitHub Issue를 픽업해서 작업 → 가
 ## 인자
 
 `/b-start <issue_num>` — 특정 이슈 처리 (예: `/b-start 4`)
-`/b-start` — `claude-process` 라벨 + open + assignee=@me 중 가장 오래된 것
+`/b-start` — open + assignee=@me 중 가장 오래된 것 (RED 테스트 브랜치 `<num>-*`가 origin에 있는 것 우선)
 
 ---
 
@@ -21,9 +21,19 @@ Buildee 본체 (`bradyoo12/buildee`) GitHub Issue를 픽업해서 작업 → 가
 ISSUE_NUM=$(echo "$ARGUMENTS" | grep -oE '^[0-9]+' || true)
 
 if [ -z "$ISSUE_NUM" ]; then
-  ISSUE_NUM=$(gh issue list --repo bradyoo12/buildee \
-    --label claude-process --state open --assignee @me \
-    --limit 1 --json number --jq '.[0].number')
+  # 1순위: origin에 RED 브랜치(`<num>-<slug>`)가 이미 푸시된 open + assignee=@me 이슈
+  git fetch origin --prune 2>/dev/null || true
+  for n in $(gh issue list --repo bradyoo12/buildee --state open --assignee @me \
+              --limit 20 --json number --jq '.[].number' | sort -n); do
+    if git branch -r | grep -qE "origin/${n}-"; then
+      ISSUE_NUM=$n; break
+    fi
+  done
+  # 2순위: RED 브랜치 없어도 가장 오래된 open + assignee=@me 이슈
+  if [ -z "$ISSUE_NUM" ]; then
+    ISSUE_NUM=$(gh issue list --repo bradyoo12/buildee --state open --assignee @me \
+      --limit 1 --json number --jq '.[0].number')
+  fi
 fi
 
 if [ -z "$ISSUE_NUM" ]; then
@@ -58,7 +68,7 @@ ISSUE_BODY=$(jq -r .body /tmp/issue.json)
 
 ```bash
 SLUG=$(echo "$ISSUE_TITLE" | tr '[:upper:]' '[:lower:]' | tr -cs '[:alnum:]' '-' | cut -c1-30 | sed 's/-$//')
-BRANCH="ticket-${ISSUE_NUM}-${SLUG}"
+BRANCH="${ISSUE_NUM}-${SLUG}"   # 예: 4-infra-readme-monorepo
 
 git fetch origin
 

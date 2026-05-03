@@ -1,0 +1,94 @@
+
+Microsoft Visual Studio Solution File, Format Version 12.00
+# Visual Studio Version 17
+VisualStudioVersion = 17.0.0.0
+MinimumVisualStudioVersion = 10.0.40219.1
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Solution Items", "Solution Items", "{A0000001-0000-0000-0000-000000000001}"
+	ProjectSection(SolutionItems) = preProject
+		CLAUDE.md = CLAUDE.md
+		README.md = README.md
+		package.json = package.json
+		pnpm-lock.yaml = pnpm-lock.yaml
+		pnpm-workspace.yaml = pnpm-workspace.yaml
+	EndProjectSection
+EndProject
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "apps", "apps", "{A0000002-0000-0000-0000-000000000002}"
+EndProject
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "server", "server", "{A0000003-0000-0000-0000-000000000003}"
+	ProjectSection(SolutionItems) = preProject
+		apps\server\package.json = apps\server\package.json
+		apps\server\tsconfig.json = apps\server\tsconfig.json
+		apps\server\src\app.ts = apps\server\src\app.ts
+		apps\server\src\server.ts = apps\server\src\server.ts
+		apps\server\test\github-webhook.test.ts = apps\server\test\github-webhook.test.ts
+		apps\server\test\health.test.ts = apps\server\test\health.test.ts
+		apps\server\test\ticket-4.test.ts = apps\server\test\ticket-4.test.ts
+	EndProjectSection
+EndProject
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "packages", "packages", "{A0000004-0000-0000-0000-000000000004}"
+EndProject
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "db", "db", "{A0000005-0000-0000-0000-000000000005}"
+	ProjectSection(SolutionItems) = preProject
+		packages\db\package.json = packages\db\package.json
+		packages\db\tsconfig.json = packages\db\tsconfig.json
+		packages\db\src\index.ts = packages\db\src\index.ts
+		packages\db\src\project-db-manager.ts = packages\db\src\project-db-manager.ts
+		packages\db\src\queue.ts = packages\db\src\queue.ts
+		packages\db\src\short-id.ts = packages\db\src\short-id.ts
+		packages\db\prisma\schema.prisma = packages\db\prisma\schema.prisma
+		packages\db\prisma\project-schema.prisma = packages\db\prisma\project-schema.prisma
+	EndProjectSection
+EndProject
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "infra", "infra", "{A0000006-0000-0000-0000-000000000006}"
+	ProjectSection(SolutionItems) = preProject
+		infra\main.bicep = infra\main.bicep
+	EndProjectSection
+EndProject
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "docs", "docs", "{A0000007-0000-0000-0000-000000000007}"
+	ProjectSection(SolutionItems) = preProject
+		docs\deployment-runbook.md = docs\deployment-runbook.md
+		docs\github-app-setup.md = docs\github-app-setup.md
+	EndProjectSection
+EndProject
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "decisions", "decisions", "{A0000008-0000-0000-0000-000000000008}"
+	ProjectSection(SolutionItems) = preProject
+		docs\decisions\0001-data-layout.md = docs\decisions\0001-data-layout.md
+		docs\decisions\0002-worker-tiers.md = docs\decisions\0002-worker-tiers.md
+		docs\decisions\0003-change-categories.md = docs\decisions\0003-change-categories.md
+		docs\decisions\0004-guardrails.md = docs\decisions\0004-guardrails.md
+		docs\decisions\0005-immutable-versions.md = docs\decisions\0005-immutable-versions.md
+		docs\decisions\0006-mobile-strategy.md = docs\decisions\0006-mobile-strategy.md
+		docs\decisions\0007-billing-recommendation.md = docs\decisions\0007-billing-recommendation.md
+	EndProjectSection
+EndProject
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = ".github", ".github", "{A0000009-0000-0000-0000-000000000009}"
+	ProjectSection(SolutionItems) = preProject
+		.github\workflows\deploy-server.yml = .github\workflows\deploy-server.yml
+	EndProjectSection
+EndProject
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = ".claude", ".claude", "{A000000A-0000-0000-0000-00000000000A}"
+	ProjectSection(SolutionItems) = preProject
+		.claude\README.md = .claude\README.md
+		.claude\settings.local.json = .claude\settings.local.json
+		.claude\commands\b-start.md = .claude\commands\b-start.md
+		.claude\commands\create-ticket.md = .claude\commands\create-ticket.md
+		.claude\commands\create-ticket-log.md = .claude\commands\create-ticket-log.md
+	EndProjectSection
+EndProject
+Global
+	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		Debug|Any CPU = Debug|Any CPU
+		Release|Any CPU = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(SolutionProperties) = preSolution
+		HideSolutionNode = FALSE
+	EndGlobalSection
+	GlobalSection(NestedProjects) = preSolution
+		{A0000003-0000-0000-0000-000000000003} = {A0000002-0000-0000-0000-000000000002}
+		{A0000005-0000-0000-0000-000000000005} = {A0000004-0000-0000-0000-000000000004}
+		{A0000008-0000-0000-0000-000000000008} = {A0000007-0000-0000-0000-000000000007}
+	EndGlobalSection
+	GlobalSection(ExtensibilityGlobals) = postSolution
+		SolutionGuid = {B1111111-1111-1111-1111-111111111111}
+	EndGlobalSection
+EndGlobal
